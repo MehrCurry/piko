@@ -1,12 +1,29 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<blueprint xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-       xmlns:camel="http://camel.apache.org/schema/blueprint"
-       xsi:schemaLocation="
-       http://www.osgi.org/xmlns/blueprint/v1.0.0 http://www.osgi.org/xmlns/blueprint/v1.0.0/blueprint.xsd
-       http://camel.apache.org/schema/blueprint http://camel.apache.org/schema/blueprint/camel-blueprint.xsd">
+package de.gzockoll.solar.piko;
 
-    <camelContext id="solarContext" trace="false" xmlns="http://camel.apache.org/schema/blueprint">
+import org.apache.camel.builder.RouteBuilder;
+
+public class PikoRouteBuilder extends RouteBuilder {
+    @Override
+    public void configure() throws Exception {
+        from("seda:readPiko")
+                .to("http4://192.168.187.39?nocache&authMethod=Basic&authUsername=pvserver&authPassword=pvwr&bridgeEndpoint=true")
+                .unmarshal().tidyMarkup();
+
+        from("servlet:///solar/momentan")
+                .to("seda:readPiko").setBody().xpath("/html/body/form/table[3]/tr[4]/td[3]/text()");
+
+        from("servlet:///solar/tag")
+                .to("seda:readPiko")
+                .setBody().xpath("/html/body/form/table[3]/tr[6]/td[6]/text()");
+
+        from("servlet:///solar/gesamt")
+                .to("seda:readPiko")
+                .setBody().xpath("/html/body/form/table[3]/tr[4]/td[6]/text()");
+
+    }
+}
+
+/*
         <route id="readPiko">
             <from uri="seda:readPiko" />
             <to uri="http4://192.168.187.39?nocache&amp;authMethod=Basic&amp;authUsername=pvserver&amp;authPassword=pvwr&amp;bridgeEndpoint=true" />
@@ -35,6 +52,6 @@
                 <xpath>/html/body/form/table[3]/tr[4]/td[6]/text()</xpath>
             </setBody>
         </route>
-    </camelContext>
 
-</blueprint>
+
+ */
