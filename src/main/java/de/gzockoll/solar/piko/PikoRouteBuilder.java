@@ -1,13 +1,21 @@
 package de.gzockoll.solar.piko;
 
+import com.google.common.collect.ImmutableMap;
 import org.apache.camel.builder.RouteBuilder;
+
+import java.util.Map;
 
 public class PikoRouteBuilder extends RouteBuilder {
     @Override
     public void configure() throws Exception {
+        getContext().setTracing(true);
+        Map params= ImmutableMap.builder().put("edWrNr",1).build();
         from("seda:readPiko")
                 .to("http4://192.168.187.39?nocache&authMethod=Basic&authUsername=pvserver&authPassword=pvwr&bridgeEndpoint=true")
-                .unmarshal().tidyMarkup();
+                .unmarshal().tidyMarkup().wireTap("direct:save");
+
+        from("direct:save")
+                .to("file:outbox?fileName=piko.html");
 
         from("servlet:///solar/momentan")
                 .to("seda:readPiko").setBody().xpath("/html/body/form/table[3]/tr[4]/td[3]/text()");
@@ -19,7 +27,6 @@ public class PikoRouteBuilder extends RouteBuilder {
         from("servlet:///solar/gesamt")
                 .to("seda:readPiko")
                 .setBody().xpath("/html/body/form/table[3]/tr[4]/td[6]/text()");
-
     }
 }
 
