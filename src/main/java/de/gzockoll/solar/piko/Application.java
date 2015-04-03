@@ -1,7 +1,7 @@
 package de.gzockoll.solar.piko;
 
-<<<<<<< HEAD
 import org.apache.camel.builder.RouteBuilder;
+
 import org.apache.camel.component.servlet.CamelHttpTransportServlet;
 import org.apache.camel.spring.SpringCamelContext;
 import org.springframework.boot.SpringApplication;
