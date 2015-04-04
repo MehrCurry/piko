@@ -12,10 +12,7 @@ public class PikoRouteBuilder extends RouteBuilder {
         Map params= ImmutableMap.builder().put("edWrNr",1).build();
         from("seda:readPiko")
                 .to("http4://192.168.187.39?nocache&authMethod=Basic&authUsername=pvserver&authPassword=pvwr&bridgeEndpoint=true")
-                .unmarshal().tidyMarkup().wireTap("direct:save");
-
-        from("direct:save")
-                .to("file:outbox?fileName=piko.html");
+                .unmarshal().tidyMarkup();
 
         from("servlet:///solar/momentan")
                 .to("seda:readPiko").setBody().xpath("/html/body/form/table[3]/tr[4]/td[3]/text()");

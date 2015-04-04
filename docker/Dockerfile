@@ -1,5 +1,5 @@
 FROM java:8
 
-ADD *.jar
+ADD *.jar piko.jar
 
-RUN java -jar *.jar
+CMD java -jar piko.jar
