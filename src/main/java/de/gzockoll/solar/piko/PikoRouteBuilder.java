@@ -1,10 +1,14 @@
 package de.gzockoll.solar.piko;
 
 import com.google.common.collect.ImmutableMap;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.camel.ExchangePattern;
 import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.util.toolbox.AggregationStrategies;
 
 import java.util.Map;
 
+@Slf4j
 public class PikoRouteBuilder extends RouteBuilder {
     @Override
     public void configure() throws Exception {
@@ -15,47 +19,57 @@ public class PikoRouteBuilder extends RouteBuilder {
                 .unmarshal().tidyMarkup();
 
         from("servlet:///solar/momentan")
-                .to("seda:readPiko").setBody().xpath("/html/body/form/table[3]/tr[4]/td[3]/text()");
+                .to("seda:readPiko").to("direct:momentan");
+
+        from("direct:momentan")
+                .setHeader("Content",constant("momentan"))
+                .setBody().xpath("/html/body/form/table[3]/tr[4]/td[3]/text()").convertBodyTo(String.class);
 
         from("servlet:///solar/tag")
-                .to("seda:readPiko")
-                .setBody().xpath("/html/body/form/table[3]/tr[6]/td[6]/text()");
+                .to("seda:readPiko").to("direct:tag");
+
+        from("direct:tag")
+                .setHeader("Content", constant("tag"))
+                .setBody().xpath("/html/body/form/table[3]/tr[6]/td[6]/text()").convertBodyTo(String.class);
 
         from("servlet:///solar/gesamt")
+                .to("seda:readPiko").to("direct:gesamt");
+
+        from("direct:gesamt")
+                .setHeader("Content", constant("gesamt"))
+                .setBody().xpath("/html/body/form/table[3]/tr[4]/td[6]/text()")
+                .convertBodyTo(String.class);
+
+        from("servlet:///solar/daten")
                 .to("seda:readPiko")
-                .setBody().xpath("/html/body/form/table[3]/tr[4]/td[6]/text()");
+                .multicast(AggregationStrategies.beanAllowNull(
+                        new Aggregator(), "aggregate"))
+                    .to("direct:momentan", "direct:tag", "direct:gesamt")
+                .end();
+
+        from("timer://foo?period=10000")
+                .setExchangePattern(ExchangePattern.InOut)
+                .to("seda:readPiko")
+                .process(exchange ->
+                        log.debug(exchange.toString()))
+                .multicast()
+                    .to("direct:setMomentan", "direct:setTag", "direct:setGesamt")
+                .end();
+
+        from("direct:setMomentan")
+                .to("direct:momentan")
+                .process(exchange ->
+                        log.debug(exchange.toString()))
+                .recipientList(simple("http4://cubieez:8081/api/set/Momentan%20Leistung/?value=${body.trim()}"));
+
+        from("direct:setTag")
+                .to("direct:tag")
+                .recipientList(simple("http4://cubieez:8081/api/set/Tages%20Leistung/?value=${body.trim()}"));
+
+        from("direct:setGesamt")
+                .to("direct:gesamt")
+                .recipientList(simple("http4://cubieez:8081/api/set/Gesamt%20Leistung/?value=${body.trim()}"));
+
+
     }
 }
-
-/*
-        <route id="readPiko">
-            <from uri="seda:readPiko" />
-            <to uri="http4://192.168.187.39?nocache&amp;authMethod=Basic&amp;authUsername=pvserver&amp;authPassword=pvwr&amp;bridgeEndpoint=true" />
-            <unmarshal>
-                <tidyMarkup/>
-            </unmarshal>
-        </route>
-        <route id="route1">
-            <from uri="jetty:http://0.0.0.0:11145/solar/momentan" />
-            <to uri="seda:readPiko" />
-            <setBody>
-                <xpath>/html/body/form/table[3]/tr[4]/td[3]/text()</xpath>
-            </setBody>
-        </route>
-        <route id="route2">
-            <from uri="jetty:http://0.0.0.0:11145/solar/tag" />
-            <to uri="seda:readPiko" />
-            <setBody>
-                <xpath>/html/body/form/table[3]/tr[6]/td[6]/text()</xpath>
-            </setBody>
-        </route>
-        <route id="route3">
-            <from uri="jetty:http://0.0.0.0:11145/solar/gesamt" />
-            <to uri="seda:readPiko" />
-            <setBody>
-                <xpath>/html/body/form/table[3]/tr[4]/td[6]/text()</xpath>
-            </setBody>
-        </route>
-
-
- */
