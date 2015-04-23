@@ -5,10 +5,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.camel.ExchangePattern;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.util.toolbox.AggregationStrategies;
+import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
 @Slf4j
+//@Component
 public class PikoRouteBuilder extends RouteBuilder {
     @Override
     public void configure() throws Exception {
@@ -47,29 +49,26 @@ public class PikoRouteBuilder extends RouteBuilder {
                     .to("direct:momentan", "direct:tag", "direct:gesamt")
                 .end();
 
-        from("timer://foo?period=10000")
+        from("timer://foo?period=30000")
                 .setExchangePattern(ExchangePattern.InOut)
                 .to("seda:readPiko")
-                .process(exchange ->
-                        log.debug(exchange.toString()))
                 .multicast()
                     .to("direct:setMomentan", "direct:setTag", "direct:setGesamt")
                 .end();
 
         from("direct:setMomentan")
+                .to("log:bla?showAll=true&multiline=true")
                 .to("direct:momentan")
-                .process(exchange ->
-                        log.debug(exchange.toString()))
-                .recipientList(simple("http4://cubieez:8081/api/set/Momentan%20Leistung/?value=${body.trim()}"));
+                .to("mqtt:bar?host=tcp://docker:1883&publishTopicName=piko/status/Momentan_Leistung");
 
         from("direct:setTag")
                 .to("direct:tag")
-                .recipientList(simple("http4://cubieez:8081/api/set/Tages%20Leistung/?value=${body.trim()}"));
+                .to("mqtt:bar?host=tcp://docker:1883&publishTopicName=piko/status/Tages_Energie");
 
         from("direct:setGesamt")
                 .to("direct:gesamt")
-                .recipientList(simple("http4://cubieez:8081/api/set/Gesamt%20Leistung/?value=${body.trim()}"));
+                .to("mqtt:bar?host=tcp://docker:1883&publishTopicName=piko/status/Gesamt_Energie");
 
-
+        from("mqtt:bar?host=tcp://docker:1883&subscribeTopicName=hm/status/Temperatur Sensor innen/TEMPERATURE").transform(body().convertToString()).to("mock:result");
     }
 }
